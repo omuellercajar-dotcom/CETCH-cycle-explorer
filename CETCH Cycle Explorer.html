@@ -1,0 +1,879 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>CETCH Cycle Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* Layout: single reading column on a cool blueprint ground; the cycle wheel and
+   parts list break out to a wider working band. Colour is semantic only —
+   it encodes which cofactor a reaction spends. */
+:root{
+  --paper:#e9edf2;
+  --surface:#f8fafc;
+  --surface-2:#eef2f7;
+  --ink:#141a23;
+  --ink-soft:#4e5a6b;
+  --ink-faint:#7b8798;
+  --rule:#c6cedb;
+  --carb:#a9560d;      /* carboxylation — the two CO2-fixing steps */
+  --redox:#0d6166;     /* NADPH-consuming reduction */
+  --ox:#5f4a97;        /* O2-consuming oxidation */
+  --atp:#9a2f52;       /* ATP-consuming activation */
+  --neutral-mark:#8793a5;
+  --chip-fill:#ffffff;
+  --shadow:0 1px 2px rgba(20,26,35,.07),0 6px 18px rgba(20,26,35,.06);
+  --f-display:"IBM Plex Sans Condensed","Helvetica Neue",Arial,sans-serif;
+  --f-body:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+  --f-data:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#11151c;
+    --surface:#181d26;
+    --surface-2:#1f252f;
+    --ink:#e7ecf3;
+    --ink-soft:#a8b3c2;
+    --ink-faint:#7b8798;
+    --rule:#333c4a;
+    --carb:#e0974e;
+    --redox:#51b7bd;
+    --ox:#ab96e2;
+    --atp:#e88aa6;
+    --neutral-mark:#7f8b9c;
+    --chip-fill:#1f252f;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#11151c;
+  --surface:#181d26;
+  --surface-2:#1f252f;
+  --ink:#e7ecf3;
+  --ink-soft:#a8b3c2;
+  --ink-faint:#7b8798;
+  --rule:#333c4a;
+  --carb:#e0974e;
+  --redox:#51b7bd;
+  --ox:#ab96e2;
+  --atp:#e88aa6;
+  --neutral-mark:#7f8b9c;
+  --chip-fill:#1f252f;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-size:16.5px;
+  line-height:1.6;
+  padding-block:0 4rem;
+  padding-inline:20px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1160px;margin:0 auto}
+.col{max-width:64ch;margin:0 auto}
+h1,h2,h3,.eyebrow,.chipname{font-family:var(--f-display)}
+h1{font-size:clamp(2.1rem,6vw,3.4rem);line-height:1.02;margin:0;letter-spacing:-.015em;text-wrap:balance}
+h2{font-size:clamp(1.5rem,3.4vw,2rem);line-height:1.1;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:1.12rem;margin:0;letter-spacing:.005em}
+p{margin:0}
+a{color:inherit;text-underline-offset:3px;text-decoration-thickness:1px;text-decoration-color:var(--rule)}
+a:hover{text-decoration-color:var(--carb)}
+:focus-visible{outline:2px solid var(--carb);outline-offset:2px;border-radius:3px}
+
+.eyebrow{
+  font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-faint);font-weight:600;
+}
+.mono{font-family:var(--f-data)}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---- masthead ---- */
+header.top{
+  border-bottom:1px solid var(--rule);
+  padding-block:3.2rem 1.6rem;margin-bottom:2.4rem;
+}
+.top .stack{display:flex;flex-direction:column;gap:1.1rem}
+.cite{font-size:.86rem;color:var(--ink-soft);font-family:var(--f-data);line-height:1.5}
+.lede{font-size:1.16rem;color:var(--ink-soft);max-width:60ch}
+.facts{
+  display:flex;flex-wrap:wrap;gap:0 1.6rem;border-top:1px solid var(--rule);
+  padding-top:1rem;margin-top:.4rem;
+}
+.facts div{display:flex;gap:.45rem;align-items:baseline;padding-block:.25rem}
+.facts b{font-family:var(--f-data);font-size:1.05rem;font-weight:600;font-variant-numeric:tabular-nums}
+.facts span{font-size:.78rem;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint);font-family:var(--f-display)}
+
+section{margin-block:3.6rem}
+.sechead{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1.3rem}
+.body-flow{display:flex;flex-direction:column;gap:1.05rem}
+
+figure{margin:0}
+figcaption{font-size:.86rem;color:var(--ink-soft);line-height:1.5;margin-top:.7rem}
+.fig-scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:14px}
+.fig-scroll svg{display:block;height:auto;max-width:100%}
+
+/* ---- the wheel ---- */
+.reactor{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:1.6rem;align-items:start}
+@media (max-width:860px){.reactor{grid-template-columns:minmax(0,1fr)}}
+#wheelBox{overflow-x:auto;min-width:0;max-width:100%}
+#wheel{display:block;height:auto;width:100%;min-width:600px;color:var(--ink)}
+.controls{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.9rem}
+button{
+  font-family:var(--f-display);font-size:.86rem;font-weight:600;letter-spacing:.03em;
+  background:var(--surface);color:var(--ink);border:1px solid var(--rule);
+  border-radius:3px;padding:.46rem .85rem;cursor:pointer;
+}
+button:hover{border-color:var(--carb);color:var(--carb)}
+button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.ledger{
+  border:1px solid var(--rule);border-radius:3px;background:var(--surface);
+  padding:.75rem .9rem;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:.55rem .8rem;font-family:var(--f-data);font-size:.82rem;
+}
+.ledger div{display:flex;justify-content:space-between;gap:.5rem;border-bottom:1px dotted var(--rule);padding-bottom:.3rem}
+.ledger .k{color:var(--ink-soft)}
+.ledger .v{font-variant-numeric:tabular-nums;font-weight:600}
+.panel{
+  border:1px solid var(--rule);border-radius:3px;background:var(--surface);
+  padding:1.1rem 1.15rem;display:flex;flex-direction:column;gap:.8rem;box-shadow:var(--shadow);
+  min-width:0;
+}
+.panel>*{min-width:0}
+.panel .rowtop{display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap}
+.stepno{font-family:var(--f-data);font-size:.78rem;color:var(--ink-faint);letter-spacing:.08em}
+.panel h3{display:flex;align-items:center;gap:.5rem}
+.swatch{width:10px;height:10px;border-radius:2px;flex:none}
+.eq{
+  font-family:var(--f-data);font-size:.83rem;line-height:1.65;background:var(--surface-2);
+  border-left:2px solid var(--rule);padding:.6rem .7rem;overflow-x:auto;white-space:nowrap;
+}
+.spends{display:flex;flex-wrap:wrap;gap:.35rem}
+.tag{
+  font-family:var(--f-data);font-size:.72rem;padding:.16rem .45rem;border-radius:2px;
+  border:1px solid currentColor;letter-spacing:.02em;
+}
+.panel p{font-size:.95rem;color:var(--ink-soft);line-height:1.62}
+.navrow{display:flex;gap:.5rem;margin-top:.2rem}
+.legend{display:flex;flex-wrap:wrap;gap:.2rem 1.1rem;font-size:.78rem;color:var(--ink-soft);font-family:var(--f-data);margin-top:.9rem}
+.legend span{display:flex;align-items:center;gap:.4rem}
+
+/* ---- tables ---- */
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:540px}
+th,td{text-align:left;padding:.55rem .7rem;border-bottom:1px solid var(--rule);vertical-align:top}
+thead th{
+  font-family:var(--f-display);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-faint);font-weight:600;white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:none}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--f-data)}
+td.code{font-family:var(--f-data);font-size:.82rem;white-space:nowrap}
+tr.clickable{cursor:pointer}
+tr.clickable:hover{background:var(--surface-2)}
+tr.on{background:var(--surface-2);box-shadow:inset 2px 0 0 var(--carb)}
+
+/* ---- design-decision cards ---- */
+.decks{display:flex;flex-direction:column;gap:1.1rem}
+.deck{border:1px solid var(--rule);border-radius:3px;background:var(--surface);padding:1.05rem 1.1rem}
+.deck .q{font-size:1rem;margin-bottom:.75rem}
+.opts{display:flex;flex-direction:column;gap:.45rem}
+.opt{
+  text-align:left;width:100%;font-family:var(--f-body);font-size:.92rem;font-weight:400;
+  letter-spacing:0;line-height:1.45;padding:.55rem .7rem;
+}
+.opt.picked{border-color:var(--ink);background:var(--surface-2);color:var(--ink)}
+.opt .mark{font-family:var(--f-data);font-size:.74rem;color:var(--ink-faint);margin-right:.5rem}
+.fb{margin-top:.75rem;font-size:.93rem;color:var(--ink-soft);border-left:2px solid var(--carb);padding-left:.75rem;line-height:1.6}
+.fb b{color:var(--ink);font-family:var(--f-display);letter-spacing:.02em}
+
+/* ---- tutorial questions ---- */
+details{border-bottom:1px solid var(--rule);padding-block:.85rem}
+details:first-of-type{border-top:1px solid var(--rule)}
+summary{cursor:pointer;font-size:1rem;list-style:none;display:flex;gap:.7rem;align-items:baseline}
+summary::-webkit-details-marker{display:none}
+summary .qn{font-family:var(--f-data);font-size:.78rem;color:var(--ink-faint);flex:none;padding-top:.15rem}
+summary .qt{flex:1;min-width:0}
+summary::after{content:"+";font-family:var(--f-data);color:var(--ink-faint);flex:none}
+details[open] summary::after{content:"–"}
+details .ans{margin-top:.7rem;padding-left:2.1rem;font-size:.95rem;color:var(--ink-soft);display:flex;flex-direction:column;gap:.6rem}
+@media (max-width:520px){details .ans{padding-left:0}}
+
+ul.plain{margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:.4rem}
+ul.plain li{padding-left:.15rem}
+.callout{
+  border:1px solid var(--rule);border-left:3px solid var(--carb);border-radius:3px;
+  background:var(--surface);padding:.95rem 1.05rem;font-size:.95rem;color:var(--ink-soft);
+  display:flex;flex-direction:column;gap:.55rem;
+}
+.callout b{color:var(--ink);font-family:var(--f-display);letter-spacing:.02em}
+footer{border-top:1px solid var(--rule);padding-top:1.4rem;font-size:.88rem;color:var(--ink-soft);display:flex;flex-direction:column;gap:.55rem}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <div class="stack">
+    <div class="eyebrow">A seventh route to fixed carbon</div>
+    <h1>The CETCH cycle</h1>
+    <p class="lede">Evolution produced six pathways for turning CO<sub>2</sub> into biomass. In 2016 Tobias Erb's group drew a seventh on paper, assembled it from seventeen purified enzymes, and ran it in a test tube. This page takes it apart one reaction at a time.</p>
+    <p class="cite">Schwander T, Schada von Borzyskowski L, Burgener S, Cortina NS, Erb TJ (2016) <i>A synthetic pathway for the fixation of carbon dioxide in vitro.</i> Science 354:900–904.</p>
+    <div class="facts">
+      <div><b>17</b><span>enzymes</span></div>
+      <div><b>9</b><span>source organisms</span></div>
+      <div><b>3</b><span>domains of life</span></div>
+      <div><b>2 CO<sub>2</sub></b><span>per turn</span></div>
+      <div><b>1</b><span>glyoxylate out</span></div>
+      <div><b>5</b><span>nmol CO<sub>2</sub> min⁻¹ mg⁻¹</span></div>
+    </div>
+  </div>
+</header>
+
+<section class="col">
+  <div class="sechead">
+    <div class="eyebrow">01 — The design brief</div>
+    <h2>Why build a carbon-fixation pathway from scratch?</h2>
+  </div>
+  <div class="body-flow">
+    <p>Rubisco is the most abundant enzyme on Earth and one of the slowest. It turns over a few times per second, and it cannot reliably tell CO<sub>2</sub> from O<sub>2</sub>: in a C3 leaf in air, roughly one in every three or four reactions is an oxygenation, which produces 2-phosphoglycolate and sets off photorespiration to clean it up.</p>
+    <p>Decades of attempts to fix Rubisco have moved the needle very little. The alternative is to stop fixing Rubisco and start from the carboxylase you would rather have. Erb's group had one: <b>enoyl-CoA carboxylase/reductases</b> (ECRs), a family of enzymes from bacterial acetyl-CoA assimilation that carboxylate a C=C double bond using NADPH, with no biotin, no ATP, and no measurable reaction with oxygen.</p>
+    <p>From there the design runs backwards — the approach the authors call <b>metabolic retrosynthesis</b>. Pick the target product. Pick the carboxylase. Then search enzyme databases for a sequence of reactions that returns the carboxylase's product to its own substrate, closing a cycle. The chemistry is constrained by what enzymes exist, not by what evolution happened to assemble in one organism.</p>
+
+    <figure style="margin-top:.6rem">
+      <div class="fig-scroll">
+        <svg viewBox="0 0 700 272" role="img" aria-label="Comparison of Rubisco, which branches between carboxylation and oxygenation, with Ccr, which carboxylates only." style="min-width:600px">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="currentColor"></path>
+            </marker>
+            <marker id="ah-carb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--carb)"></path>
+            </marker>
+          </defs>
+
+          <text x="18" y="26" font-family="var(--f-display)" font-size="13" font-weight="700" fill="currentColor" letter-spacing="1.4">RUBISCO</text>
+          <text x="18" y="44" font-family="var(--f-data)" font-size="11" fill="var(--ink-faint)">one active site, two gases</text>
+
+          <rect x="18" y="116" width="104" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1.2"></rect>
+          <text x="70" y="137" text-anchor="middle" font-family="var(--f-data)" font-size="11" fill="currentColor">RuBP</text>
+
+          <line x1="122" y1="133" x2="186" y2="133" stroke="currentColor" stroke-width="1.2" marker-end="url(#ah)"></line>
+          <circle cx="214" cy="133" r="26" fill="none" stroke="currentColor" stroke-width="1.2"></circle>
+          <text x="214" y="137" text-anchor="middle" font-family="var(--f-data)" font-size="10.5" fill="currentColor">Rbc</text>
+
+          <path d="M240 126 C 268 100, 272 86, 288 78" fill="none" stroke="var(--carb)" stroke-width="1.6" marker-end="url(#ah-carb)"></path>
+          <text x="250" y="100" font-family="var(--f-data)" font-size="10.5" fill="var(--carb)">+ CO₂</text>
+          <rect x="296" y="60" width="118" height="34" rx="3" fill="none" stroke="var(--carb)" stroke-width="1.2"></rect>
+          <text x="355" y="81" text-anchor="middle" font-family="var(--f-data)" font-size="11" fill="var(--carb)">2 × 3-PGA</text>
+
+          <path d="M240 142 C 268 170, 272 184, 288 192" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="5 3" marker-end="url(#ah)"></path>
+          <text x="250" y="186" font-family="var(--f-data)" font-size="10.5" fill="currentColor">+ O₂</text>
+          <rect x="296" y="174" width="118" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 3"></rect>
+          <text x="355" y="195" text-anchor="middle" font-family="var(--f-data)" font-size="11" fill="currentColor">3-PGA + 2-PG</text>
+          <text x="296" y="228" font-family="var(--f-data)" font-size="10.5" fill="var(--ink-faint)">≈1 in 3–4 events in air →</text>
+          <text x="296" y="243" font-family="var(--f-data)" font-size="10.5" fill="var(--ink-faint)">photorespiration</text>
+
+          <line x1="446" y1="20" x2="446" y2="252" stroke="var(--rule)" stroke-width="1"></line>
+
+          <text x="470" y="26" font-family="var(--f-display)" font-size="13" font-weight="700" fill="currentColor" letter-spacing="1.4">Ccr</text>
+          <text x="470" y="44" font-family="var(--f-data)" font-size="11" fill="var(--ink-faint)">reductive carboxylation only</text>
+
+          <rect x="470" y="116" width="112" height="34" rx="3" fill="none" stroke="currentColor" stroke-width="1.2"></rect>
+          <text x="526" y="131" text-anchor="middle" font-family="var(--f-data)" font-size="10.5" fill="currentColor">crotonyl-CoA</text>
+          <text x="526" y="144" text-anchor="middle" font-family="var(--f-data)" font-size="9.5" fill="var(--ink-faint)">(an enoyl-CoA)</text>
+
+          <path d="M582 133 L 628 133" fill="none" stroke="var(--carb)" stroke-width="1.6" marker-end="url(#ah-carb)"></path>
+          <text x="584" y="122" font-family="var(--f-data)" font-size="10.5" fill="var(--carb)">+ CO₂</text>
+          <text x="584" y="152" font-family="var(--f-data)" font-size="10.5" fill="var(--carb)">+ NADPH</text>
+          <rect x="636" y="104" width="48" height="58" rx="3" fill="none" stroke="var(--carb)" stroke-width="1.2"></rect>
+          <text x="660" y="128" text-anchor="middle" font-family="var(--f-data)" font-size="10" fill="var(--carb)">ethyl-</text>
+          <text x="660" y="140" text-anchor="middle" font-family="var(--f-data)" font-size="10" fill="var(--carb)">malonyl</text>
+          <text x="660" y="152" text-anchor="middle" font-family="var(--f-data)" font-size="10" fill="var(--carb)">-CoA</text>
+
+          <line x1="526" y1="186" x2="526" y2="214" stroke="var(--ink-faint)" stroke-width="1.2" stroke-dasharray="4 3"></line>
+          <line x1="516" y1="196" x2="536" y2="214" stroke="var(--ink-faint)" stroke-width="1.6"></line>
+          <line x1="536" y1="196" x2="516" y2="214" stroke="var(--ink-faint)" stroke-width="1.6"></line>
+          <text x="470" y="238" font-family="var(--f-data)" font-size="10.5" fill="var(--ink-faint)">no oxygenase side reaction</text>
+        </svg>
+      </div>
+      <figcaption>The branch that justifies the whole project. Rubisco's active site accepts either gas, so a fraction of its turnovers produce 2-phosphoglycolate that the cell must salvage. Ccr makes one product. Swapping the carboxylase removes the branch — but it also means nothing downstream of it exists yet, which is the rest of this page.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <div class="col sechead">
+    <div class="eyebrow">02 — One turn</div>
+    <h2>Twelve reactions, two carboxylations, one product</h2>
+    <p style="color:var(--ink-soft);margin-top:.3rem">Click any enzyme to open it, or press play and watch the ledger fill. Colour marks what a reaction spends: the cycle's cost is not spread evenly.</p>
+  </div>
+
+  <div class="reactor">
+    <div>
+      <div class="controls">
+        <button id="btnPlay" type="button">Play</button>
+        <button id="btnStep" type="button">Step</button>
+        <button id="btnReset" type="button">Reset</button>
+        <span class="mono" style="font-size:.8rem;color:var(--ink-faint)">turns completed <span class="num" id="turns">0</span></span>
+      </div>
+      <div id="wheelBox"></div>
+      <div class="legend">
+        <span><svg width="11" height="11" aria-hidden="true"><rect width="11" height="11" rx="2" fill="var(--carb)"></rect></svg> carboxylation + NADPH</span>
+        <span><svg width="11" height="11" aria-hidden="true"><rect width="11" height="11" rx="2" fill="var(--redox)"></rect></svg> NADPH</span>
+        <span><svg width="11" height="11" aria-hidden="true"><rect width="11" height="11" rx="2" fill="var(--ox)"></rect></svg> O₂</span>
+        <span><svg width="11" height="11" aria-hidden="true"><rect width="11" height="11" rx="2" fill="var(--atp)"></rect></svg> ATP</span>
+        <span><svg width="11" height="11" aria-hidden="true"><rect width="11" height="11" rx="2" fill="var(--neutral-mark)"></rect></svg> no cofactor</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:1rem">
+      <div class="ledger" id="ledger"></div>
+      <div class="panel" id="panel"></div>
+    </div>
+  </div>
+
+  <div class="col" style="margin-top:1.6rem">
+    <p class="cite" style="color:var(--ink-faint)">The wheel shows twelve chemical conversions. The paper counts <b>13 core reactions carried out by 17 enzymes</b>: it scores the two epimerisations separately from the mutase steps they feed, and includes catalase, which sits outside the ring destroying the H₂O₂ that the two oxidase steps generate.</p>
+  </div>
+</section>
+
+<section class="col">
+  <div class="sechead">
+    <div class="eyebrow">03 — The energy bill</div>
+    <h2>Where the savings actually come from</h2>
+  </div>
+  <div class="body-flow">
+    <p>Both cycles are usually compared per carbon fixed, which is fair: glyoxylate's two carbons both come from CO<sub>2</sub>, as do all three of G3P's.</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Per turn</th><th>Calvin–Benson–Bassham</th><th>CETCH 5.4</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Product</td><td>1 glyceraldehyde 3-phosphate</td><td>1 glyoxylate</td></tr>
+          <tr><td>CO₂ fixed</td><td class="n">3</td><td class="n">2</td></tr>
+          <tr><td>ATP</td><td class="n">9</td><td class="n">1 → AMP (2 equivalents)</td></tr>
+          <tr><td>NAD(P)H</td><td class="n">6</td><td class="n">4</td></tr>
+          <tr><td>O₂ consumed</td><td class="n">0</td><td class="n">2</td></tr>
+          <tr><td><b>ATP per CO₂</b></td><td class="n"><b>3</b></td><td class="n"><b>0.5 (1 equivalent)</b></td></tr>
+          <tr><td><b>NAD(P)H per CO₂</b></td><td class="n"><b>2</b></td><td class="n"><b>2</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The reducing power is identical. Every saving is in ATP, and nearly all of it comes from the carboxylase: Rubisco's substrate has to be regenerated as a bisphosphate, which costs phosphoryl transfers that an acyl-CoA cycle never pays. The single remaining ATP in CETCH activates 4-hydroxybutyrate to its CoA thioester.</p>
+
+    <div class="callout">
+      <b>Worth arguing about in class</b>
+      <p>Two steps in CETCH 5.4 — Pco and Mco — pass their electrons straight to O<sub>2</sub> and make H<sub>2</sub>O<sub>2</sub>, which catalase then destroys. In the natural ethylmalonyl-CoA pathway the equivalent dehydrogenase hands those electrons to an electron-transfer flavoprotein, where the cell can recover them. So per turn the cycle discards two pairs of electrons while paying for four NADPH. The ATP ledger looks excellent; the electron ledger looks wasteful. Whether that trade is worth making depends on what is scarce — and in a test tube fed by formate dehydrogenase, reducing power was cheap and rate was not.</p>
+    </div>
+  </div>
+</section>
+
+<section class="col">
+  <div class="sechead">
+    <div class="eyebrow">04 — Making it run</div>
+    <h2>Version 1.0 did not work</h2>
+  </div>
+  <div class="body-flow">
+    <p>A pathway that balances on paper is not a pathway that turns in a tube. Seventeen purified enzymes in one pot means seventeen pH optima, seventeen stabilities, and a great many opportunities for one enzyme to act on another's intermediate. The cycle reached its published performance only after several rounds of redesign, and the published version is numbered <span class="mono">5.4</span> for a reason.</p>
+    <p>Three kinds of problem had to be solved.</p>
+    <ul class="plain">
+      <li><b>One step set the pace.</b> Specific activities in the mix spanned five orders of magnitude — catalase around 11,700 U mg⁻¹ and mesaconyl-CoA hydratase around 1,500 U mg⁻¹ at one end, 4-hydroxybutyryl-CoA synthetase near 3.9 U mg⁻¹ and methylsuccinyl-CoA oxidase near 0.1 U mg⁻¹ at the other. Flux through a cycle is set by its slowest member, and in a closed loop a slow step does not merely limit output: it strands the carbon pool in one intermediate.</li>
+      <li><b>So the slow enzyme was rebuilt.</b> The natural methylsuccinyl-CoA dehydrogenase needs an electron-transfer partner the test tube does not have. The group re-engineered it into an oxidase that reduces O<sub>2</sub> directly, removing the need for any artificial electron mediator. This change alone is reported to have improved the cycle's performance about twenty-fold. Three of the seventeen enzymes in the final set are engineered variants rather than wild-type proteins.</li>
+      <li><b>Side products were sent back, not designed away.</b> Promiscuous enzymes make dead ends — Ccr, for instance, can reduce its enoyl-CoA substrate without carboxylating it, producing a saturated acyl-CoA that no other enzyme in the cycle will touch. Rather than engineer the promiscuity out, the authors added enzymes that convert the dead end back into a cycle intermediate. They call this <b>metabolic proofreading</b>, and it is the most transferable idea in the paper: in a synthetic pathway you can afford a correcting enzyme more easily than a perfect one.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="col">
+  <div class="sechead">
+    <div class="eyebrow">05 — Your turn</div>
+    <h2>Four decisions the designers faced</h2>
+    <p style="color:var(--ink-soft);margin-top:.3rem">Pick an answer before reading what happened. There is a defensible case for more than one option in each.</p>
+  </div>
+  <div class="decks" id="decks"></div>
+</section>
+
+<section>
+  <div class="col sechead">
+    <div class="eyebrow">06 — Parts list</div>
+    <h2>The catalysts, in order</h2>
+  </div>
+  <div class="tablewrap">
+    <table id="parts">
+      <thead>
+        <tr><th class="n">#</th><th>Enzyme</th><th>Reaction</th><th>Spends</th><th>Class</th></tr>
+      </thead>
+      <tbody id="partsBody"></tbody>
+    </table>
+  </div>
+  <div class="col" style="margin-top:1rem">
+    <p class="cite" style="color:var(--ink-faint)">The seventeen proteins come from nine organisms across bacteria, archaea and eukaryotes — the acyl-CoA oxidase, for example, is ACX4 from <i>Arabidopsis</i> peroxisomes. Alongside the core catalysts the mixture carries catalase and a cofactor-regeneration set that keeps NADPH and ATP supplied.</p>
+  </div>
+</section>
+
+<section class="col">
+  <div class="sechead">
+    <div class="eyebrow">07 — Afterwards</div>
+    <h2>What the cycle can and cannot yet do</h2>
+  </div>
+  <div class="body-flow">
+    <p>CETCH 5.4 fixes CO<sub>2</sub> at about 5 nmol min⁻¹ mg⁻¹ of protein, against roughly 1–3 nmol min⁻¹ mg⁻¹ for the Calvin cycle's enzymes. That is a genuine result and a modest one: it is an <i>in vitro</i> rate, in a mixture tuned for the purpose, with cofactors regenerated by added enzymes.</p>
+    <p>Two limitations matter most for anyone thinking about putting it in a cell. The product, glyoxylate, is reactive and poorly connected to central metabolism — it needs a partner such as acetyl-CoA or propionyl-CoA before it becomes anything useful. And the cycle runs on CoA thioesters, a metabolite class a chloroplast does not maintain at the needed concentrations, in a compartment that already contains a complete Calvin cycle competing for the same CO<sub>2</sub>.</p>
+    <p>Progress since has gone in three directions. The cycle has been driven by light rather than by added cofactors, inside droplets containing spinach thylakoid membranes — an artificial chloroplast. Its reaction conditions have been optimised by active machine learning over roughly a thousand experimental combinations, improving productivity around ten-fold. And its output has been extended downstream, through the β-hydroxyaspartate cycle and into acetyl-CoA, terpenes and polyketides, which makes the pathway a route to products rather than only to biomass.</p>
+  </div>
+</section>
+
+<section class="col">
+  <div class="sechead">
+    <div class="eyebrow">08 — Tutorial</div>
+    <h2>Questions</h2>
+  </div>
+  <div id="qs"></div>
+</section>
+
+<footer class="col">
+  <div class="eyebrow">Sources</div>
+  <div>Schwander T <i>et al.</i> (2016) A synthetic pathway for the fixation of carbon dioxide in vitro. <i>Science</i> 354:900–904. <a href="https://doi.org/10.1126/science.aah5237">doi:10.1126/science.aah5237</a></div>
+  <div>Miller TE <i>et al.</i> (2020) Light-powered CO₂ fixation in a chloroplast mimic with natural and synthetic parts. <i>Science</i> 368:649–654. <a href="https://doi.org/10.1126/science.aaz6802">doi:10.1126/science.aaz6802</a></div>
+  <div>Osmanoglu Ö <i>et al.</i> (2021) Topological analysis of the carbon-concentrating CETCH cycle and a photorespiratory bypass. <i>Front Bioeng Biotechnol</i> 9:708417. <a href="https://doi.org/10.3389/fbioe.2021.708417">doi:10.3389/fbioe.2021.708417</a> — source of the comparative rates and the specific-activity spread quoted above.</div>
+  <div>Pandi A <i>et al.</i> A versatile active learning workflow for optimization of genetic and metabolic networks. <a href="https://www.biorxiv.org/content/10.1101/2021.12.28.474323v1">bioRxiv 2021.12.28.474323</a></div>
+</footer>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var CLS = {
+  carb:{c:"var(--carb)",label:"carboxylation + NADPH"},
+  redox:{c:"var(--redox)",label:"NADPH"},
+  ox:{c:"var(--ox)",label:"O₂"},
+  atp:{c:"var(--atp)",label:"ATP"},
+  none:{c:"var(--neutral-mark)",label:"no cofactor"}
+};
+
+// metabolites sit at i*30 degrees from the top; the reaction that converts
+// metabolite i into metabolite i+1 sits at i*30 + 15.
+var MET = [
+  ["propionyl-CoA"],
+  ["acrylyl-CoA"],
+  ["(2S)-methylmalonyl-CoA"],
+  ["succinyl-CoA"],
+  ["succinic semialdehyde"],
+  ["4-hydroxybutyrate"],
+  ["4-hydroxybutyryl-CoA"],
+  ["crotonyl-CoA"],
+  ["(2S)-ethylmalonyl-CoA"],
+  ["(2S)-","methylsuccinyl-CoA"],
+  ["mesaconyl-CoA"],
+  ["β-methylmalyl-CoA"]
+];
+
+var STEPS = [
+ {abbr:"Pco", name:"Propionyl-CoA oxidase", cls:"ox",
+  eq:"propionyl-CoA + O₂ → acrylyl-CoA + H₂O₂",
+  spends:["O₂"], led:{o2:1,h2o2:1},
+  note:"A short-chain acyl-CoA oxidase — ACX4 from Arabidopsis peroxisomes — introduces the C=C double bond that the carboxylase needs. The electrons go straight to O₂, so the step costs no ATP and no NADPH, but the pair of electrons leaves as hydrogen peroxide and is lost."},
+
+ {abbr:"Ccr", name:"Crotonyl-CoA carboxylase/reductase", cls:"carb",
+  eq:"acrylyl-CoA + CO₂ + NADPH → (2S)-methylmalonyl-CoA + NADP⁺",
+  spends:["CO₂","NADPH"], led:{co2:1,nadph:1},
+  note:"Carboxylation one of two, and the reason the cycle exists. The enzyme adds CO₂ across the double bond while reducing it — one step, no biotin, no ATP, and no detectable reaction with O₂. The same enzyme catalyses step 8 on a different substrate, so one protein does both of the cycle's carbon-fixing jobs."},
+
+ {abbr:"Epi·Mcm", name:"Epimerase + methylmalonyl-CoA mutase", cls:"none",
+  eq:"(2S)-methylmalonyl-CoA → (2R)- → succinyl-CoA",
+  spends:[], led:{},
+  note:"The epimerase inverts the stereocentre because the mutase only accepts the (2R) isomer. The mutase itself is a coenzyme-B₁₂ radical enzyme: it moves the entire thioester group to the adjacent carbon, converting a branched C4 into a linear one. No net cofactor is consumed, but the cycle now depends on B₁₂."},
+
+ {abbr:"Scr", name:"Succinyl-CoA reductase", cls:"redox",
+  eq:"succinyl-CoA + NADPH → succinic semialdehyde + CoA + NADP⁺",
+  spends:["NADPH"], led:{nadph:1},
+  note:"The thioester is reduced to an aldehyde and free CoA is released. This is an engineered variant: the reaction is a common one in nature, but the natural enzymes available were not selective or fast enough for this mixture."},
+
+ {abbr:"Ssr", name:"Succinic semialdehyde reductase", cls:"redox",
+  eq:"succinic semialdehyde + NADPH → 4-hydroxybutyrate + NADP⁺",
+  spends:["NADPH"], led:{nadph:1},
+  note:"A second reduction takes the aldehyde to the alcohol. Two NADPH have now been spent getting from a thioester to a free hydroxy acid — and the CoA that was released in the previous step has to be put back on in the next one, which is where the cycle's only ATP goes."},
+
+ {abbr:"Hbs", name:"4-Hydroxybutyryl-CoA synthetase", cls:"atp",
+  eq:"4-hydroxybutyrate + CoA + ATP → 4-hydroxybutyryl-CoA + AMP + PPᵢ",
+  spends:["ATP"], led:{atp:1},
+  note:"The cycle's only ATP-consuming reaction, and it is an expensive one: hydrolysis to AMP plus pyrophosphate costs two ATP equivalents. At roughly 3.9 U mg⁻¹ this is also one of the slowest enzymes in the mixture."},
+
+ {abbr:"Hbd", name:"4-Hydroxybutyryl-CoA dehydratase", cls:"none",
+  eq:"4-hydroxybutyryl-CoA → crotonyl-CoA + H₂O",
+  spends:[], led:{},
+  note:"Loss of water regenerates an enoyl-CoA — the substrate class the carboxylase wants. Chemically this dehydration is difficult, and the enzyme uses a flavin-and-iron-sulfur radical mechanism to do it. It is oxygen-sensitive, which is awkward in a cycle that deliberately consumes O₂ twice."},
+
+ {abbr:"Ccr", name:"Crotonyl-CoA carboxylase/reductase", cls:"carb",
+  eq:"crotonyl-CoA + CO₂ + NADPH → (2S)-ethylmalonyl-CoA + NADP⁺",
+  spends:["CO₂","NADPH"], led:{co2:1,nadph:1},
+  note:"Carboxylation two of two, and the reaction the cycle is named after. This is the enzyme's natural substrate, from the ethylmalonyl-CoA pathway of bacteria such as Rhodobacter. The side reaction to watch for here is simple reduction without carboxylation, which produces a dead-end saturated acyl-CoA."},
+
+ {abbr:"Epi·Ecm", name:"Epimerase + ethylmalonyl-CoA mutase", cls:"none",
+  eq:"(2S)-ethylmalonyl-CoA → (2R)- → (2S)-methylsuccinyl-CoA",
+  spends:[], led:{},
+  note:"The same trick as step 3 — epimerise, then a B₁₂ mutase rearranges the carbon skeleton. The cycle therefore carries two radical mutases and one bifunctional epimerase that serves both of them, which is efficient in parts but makes the whole thing dependent on a scarce cofactor."},
+
+ {abbr:"Mco", name:"Methylsuccinyl-CoA oxidase", cls:"ox",
+  eq:"(2S)-methylsuccinyl-CoA + O₂ → mesaconyl-CoA + H₂O₂",
+  spends:["O₂"], led:{o2:1,h2o2:1},
+  note:"The redesigned enzyme at the centre of the story. In nature this is a dehydrogenase that passes electrons to an electron-transfer flavoprotein — a partner the test tube does not have, which made it the cycle's bottleneck at around 0.1 U mg⁻¹. Engineering it to reduce O₂ directly removed the need for an artificial mediator and is reported to have improved the whole cycle about twenty-fold."},
+
+ {abbr:"Mch", name:"Mesaconyl-CoA hydratase", cls:"none",
+  eq:"mesaconyl-CoA + H₂O → β-methylmalyl-CoA",
+  spends:[], led:{},
+  note:"Water adds across the double bond to set up the carbon–carbon bond that is about to be broken. At around 1,500 U mg⁻¹ this is one of the fastest catalysts in the mixture — four orders of magnitude faster than the step before it."},
+
+ {abbr:"Mcl", name:"β-Methylmalyl-CoA lyase", cls:"none",
+  eq:"β-methylmalyl-CoA → glyoxylate + propionyl-CoA",
+  spends:[], led:{gly:1},
+  note:"A retro-aldol cleavage closes the cycle: propionyl-CoA goes back to step 1, and glyoxylate — two carbons, both of them delivered by the two Ccr reactions — leaves as product."}
+];
+
+var LED_KEYS = [
+  ["co2","CO₂ fixed"],
+  ["nadph","NADPH"],
+  ["atp","ATP → AMP"],
+  ["o2","O₂"],
+  ["h2o2","H₂O₂"],
+  ["gly","glyoxylate"]
+];
+
+var CX=380, CY=380, R=212, CHIP_R=150, CHIP_W=72, CHIP_H=27;
+var cur = 0, turns = 0, playing = false, timer = null;
+var led = {co2:0,nadph:0,atp:0,o2:0,h2o2:0,gly:0};
+
+function pt(deg, r){
+  var a = deg * Math.PI/180;
+  return [CX + r*Math.sin(a), CY - r*Math.cos(a)];
+}
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function arcPath(d0, d1, r){
+  var p0 = pt(d0,r), p1 = pt(d1,r);
+  var large = (d1-d0) > 180 ? 1 : 0;
+  return "M"+p0[0].toFixed(1)+" "+p0[1].toFixed(1)+" A"+r+" "+r+" 0 "+large+" 1 "+p1[0].toFixed(1)+" "+p1[1].toFixed(1);
+}
+function head(deg, r, color){
+  var a = deg*Math.PI/180;
+  var p = pt(deg,r);
+  var tx = Math.cos(a), ty = Math.sin(a);           // tangent, clockwise
+  var nx = -Math.sin(a), ny = Math.cos(a);          // normal
+  var b = [p[0]-tx*10, p[1]-ty*10];
+  var q = [b[0]+nx*4.4, b[1]+ny*4.4, b[0]-nx*4.4, b[1]-ny*4.4];
+  return '<polygon points="'+p[0].toFixed(1)+','+p[1].toFixed(1)+' '+q[0].toFixed(1)+','+q[1].toFixed(1)+' '+q[2].toFixed(1)+','+q[3].toFixed(1)+'" fill="'+color+'"></polygon>';
+}
+function anchorFor(deg){
+  var s = Math.sin(deg*Math.PI/180);
+  if (s > 0.22) return "start";
+  if (s < -0.22) return "end";
+  return "middle";
+}
+
+function buildWheel(){
+  var s = [];
+  s.push('<svg id="wheel" viewBox="0 96 760 540" role="img" aria-label="The CETCH 5.4 cycle: twelve reactions converting two molecules of carbon dioxide into one glyoxylate, with propionyl-CoA regenerated each turn.">');
+
+  // sectors
+  for (var i=0;i<12;i++){
+    var st = STEPS[i], col = CLS[st.cls].c;
+    var a0 = i*30 + 4.5, a1 = i*30 + 25.5;
+    s.push('<path class="arc" data-i="'+i+'" d="'+arcPath(a0,a1,R)+'" fill="none" stroke="'+col+'" stroke-width="2.2" opacity="0.5"></path>');
+    s.push(head(a1+0.6, R, col));
+    // tick from chip up to the ring
+    var t0 = pt(i*30+15, CHIP_R+16), t1 = pt(i*30+15, R-7);
+    s.push('<line x1="'+t0[0].toFixed(1)+'" y1="'+t0[1].toFixed(1)+'" x2="'+t1[0].toFixed(1)+'" y2="'+t1[1].toFixed(1)+'" stroke="'+col+'" stroke-width="1" opacity="0.45"></line>');
+  }
+
+  // metabolite dots + labels
+  for (i=0;i<12;i++){
+    var d = pt(i*30, R);
+    s.push('<circle cx="'+d[0].toFixed(1)+'" cy="'+d[1].toFixed(1)+'" r="4.5" fill="var(--paper)" stroke="currentColor" stroke-width="1.4"></circle>');
+    var lp = pt(i*30, R+17);
+    var an = anchorFor(i*30);
+    var dy = 0;
+    if (an === "middle") dy = (i*30 === 0) ? -4 : 13;
+    else dy = 4;
+    var lines = MET[i], n = lines.length;
+    var base = lp[1] + dy - (n-1)*7.5;
+    var tsp = lines.map(function(L,k){
+      return '<tspan x="'+lp[0].toFixed(1)+'" dy="'+(k===0?0:15)+'">'+esc(L)+'</tspan>';
+    }).join("");
+    s.push('<text y="'+base.toFixed(1)+'" text-anchor="'+an+'" font-family="var(--f-display)" font-size="13.5" font-weight="600" fill="var(--ink-soft)">'+tsp+'</text>');
+  }
+
+  // CO2 inputs (inner, pointing out to the two Ccr chips)
+  [45,225].forEach(function(ang){
+    var a = pt(ang, 100), b = pt(ang, 124);
+    s.push('<line x1="'+a[0].toFixed(1)+'" y1="'+a[1].toFixed(1)+'" x2="'+b[0].toFixed(1)+'" y2="'+b[1].toFixed(1)+'" stroke="var(--carb)" stroke-width="1.6"></line>');
+    var tip = pt(ang,128), nrm = [Math.sin((ang)*Math.PI/180), -Math.cos(ang*Math.PI/180)];
+    var base = pt(ang,120);
+    var perp = [-nrm[1], nrm[0]];
+    s.push('<polygon points="'+tip[0].toFixed(1)+','+tip[1].toFixed(1)+' '+(base[0]+perp[0]*4).toFixed(1)+','+(base[1]+perp[1]*4).toFixed(1)+' '+(base[0]-perp[0]*4).toFixed(1)+','+(base[1]-perp[1]*4).toFixed(1)+'" fill="var(--carb)"></polygon>');
+    var lab = pt(ang, 86);
+    s.push('<text x="'+lab[0].toFixed(1)+'" y="'+(lab[1]+4).toFixed(1)+'" text-anchor="middle" font-family="var(--f-data)" font-size="12" font-weight="600" fill="var(--carb)">CO₂</text>');
+  });
+
+  // glyoxylate exit, outward at the Mcl chip
+  var g0 = pt(345, R+6), g1 = pt(345, R+34);
+  s.push('<line x1="'+g0[0].toFixed(1)+'" y1="'+g0[1].toFixed(1)+'" x2="'+g1[0].toFixed(1)+'" y2="'+g1[1].toFixed(1)+'" stroke="currentColor" stroke-width="1.6"></line>');
+  var gt = pt(345, R+42), gb = pt(345, R+32);
+  var ga = 345*Math.PI/180, gp = [Math.cos(ga), Math.sin(ga)];
+  s.push('<polygon points="'+gt[0].toFixed(1)+','+gt[1].toFixed(1)+' '+(gb[0]+gp[0]*4.4).toFixed(1)+','+(gb[1]+gp[1]*4.4).toFixed(1)+' '+(gb[0]-gp[0]*4.4).toFixed(1)+','+(gb[1]-gp[1]*4.4).toFixed(1)+'" fill="currentColor"></polygon>');
+  var gl = pt(345, R+56);
+  s.push('<text x="'+gl[0].toFixed(1)+'" y="'+(gl[1]+4).toFixed(1)+'" text-anchor="end" font-family="var(--f-data)" font-size="12" font-weight="600" fill="currentColor">glyoxylate</text>');
+
+  // hub
+  s.push('<text x="380" y="372" text-anchor="middle" font-family="var(--f-display)" font-size="15" font-weight="700" letter-spacing="1.6" fill="currentColor">CETCH 5.4</text>');
+  s.push('<text x="380" y="392" text-anchor="middle" font-family="var(--f-data)" font-size="11" fill="var(--ink-faint)">2 CO₂ → glyoxylate</text>');
+
+  // travelling token
+  var tk = pt(0, R);
+  s.push('<circle id="token" cx="'+tk[0].toFixed(1)+'" cy="'+tk[1].toFixed(1)+'" r="7" fill="var(--carb)" opacity="0"></circle>');
+
+  // enzyme chips last, so they sit above the arcs
+  for (i=0;i<12;i++){
+    var c = pt(i*30+15, CHIP_R);
+    var col2 = CLS[STEPS[i].cls].c;
+    s.push('<g class="chip" data-i="'+i+'" tabindex="0" role="button" aria-label="Step '+(i+1)+', '+esc(STEPS[i].name)+'" style="cursor:pointer">');
+    s.push('<rect x="'+(c[0]-CHIP_W/2).toFixed(1)+'" y="'+(c[1]-CHIP_H/2).toFixed(1)+'" width="'+CHIP_W+'" height="'+CHIP_H+'" rx="4" fill="var(--chip-fill)" stroke="'+col2+'" stroke-width="1.4"></rect>');
+    s.push('<text x="'+c[0].toFixed(1)+'" y="'+(c[1]+4.4).toFixed(1)+'" text-anchor="middle" font-family="var(--f-data)" font-size="13" font-weight="600" fill="'+col2+'">'+esc(STEPS[i].abbr)+'</text>');
+    s.push('</g>');
+  }
+
+  s.push('</svg>');
+  document.getElementById("wheelBox").innerHTML = s.join("");
+
+  var chips = document.querySelectorAll("#wheel .chip");
+  Array.prototype.forEach.call(chips, function(ch){
+    ch.addEventListener("click", function(){ stop(); select(+ch.getAttribute("data-i")); });
+    ch.addEventListener("keydown", function(e){
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); stop(); select(+ch.getAttribute("data-i")); }
+    });
+  });
+}
+
+function paintWheel(){
+  var chips = document.querySelectorAll("#wheel .chip");
+  Array.prototype.forEach.call(chips, function(ch){
+    var i = +ch.getAttribute("data-i");
+    var on = (i === cur);
+    var rect = ch.querySelector("rect");
+    rect.setAttribute("stroke-width", on ? "2.6" : "1.4");
+    rect.setAttribute("fill", on ? "var(--surface-2)" : "var(--chip-fill)");
+  });
+  var arcs = document.querySelectorAll("#wheel .arc");
+  Array.prototype.forEach.call(arcs, function(ar){
+    var i = +ar.getAttribute("data-i");
+    ar.setAttribute("opacity", i === cur ? "1" : "0.5");
+    ar.setAttribute("stroke-width", i === cur ? "4" : "2.2");
+  });
+  var tok = document.getElementById("token");
+  if (tok){
+    var p = pt(cur*30 + 15, R);
+    tok.setAttribute("cx", p[0].toFixed(1));
+    tok.setAttribute("cy", p[1].toFixed(1));
+    tok.setAttribute("fill", CLS[STEPS[cur].cls].c);
+    tok.setAttribute("opacity", "1");
+  }
+  var rows = document.querySelectorAll("#partsBody tr");
+  Array.prototype.forEach.call(rows, function(r){
+    r.className = "clickable" + (+r.getAttribute("data-i") === cur ? " on" : "");
+  });
+}
+
+function renderPanel(){
+  var st = STEPS[cur];
+  var tags = st.spends.length
+    ? st.spends.map(function(t){ return '<span class="tag" style="color:'+CLS[st.cls].c+'">'+t+'</span>'; }).join("")
+    : '<span class="tag" style="color:var(--ink-faint)">no cofactor</span>';
+  document.getElementById("panel").innerHTML =
+    '<div class="rowtop"><span class="stepno">STEP '+(cur+1)+' / 12</span></div>' +
+    '<h3><span class="swatch" style="background:'+CLS[st.cls].c+'"></span>'+esc(st.name)+' <span class="mono" style="font-size:.82rem;color:var(--ink-faint)">'+esc(st.abbr)+'</span></h3>' +
+    '<div class="eq">'+st.eq+'</div>' +
+    '<div class="spends">'+tags+'</div>' +
+    '<p>'+st.note+'</p>' +
+    '<div class="navrow"><button type="button" id="prevBtn">← Previous</button><button type="button" id="nextBtn">Next →</button></div>';
+  document.getElementById("prevBtn").addEventListener("click", function(){ stop(); select((cur+11)%12); });
+  document.getElementById("nextBtn").addEventListener("click", function(){ stop(); select((cur+1)%12); });
+}
+
+function renderLedger(){
+  document.getElementById("ledger").innerHTML = LED_KEYS.map(function(k){
+    return '<div><span class="k">'+k[1]+'</span><span class="v">'+led[k[0]]+'</span></div>';
+  }).join("");
+}
+
+function select(i){
+  cur = ((i % 12) + 12) % 12;
+  paintWheel();
+  renderPanel();
+}
+
+function advance(){
+  var next = (cur + 1) % 12;
+  var st = STEPS[next];
+  for (var k in st.led){ if (Object.prototype.hasOwnProperty.call(st.led,k)) led[k] += st.led[k]; }
+  if (next === 0){ turns++; document.getElementById("turns").textContent = turns; }
+  select(next);
+  renderLedger();
+}
+
+function stop(){
+  playing = false;
+  if (timer){ clearInterval(timer); timer = null; }
+  document.getElementById("btnPlay").textContent = "Play";
+  document.getElementById("btnPlay").setAttribute("aria-pressed","false");
+}
+
+function start(){
+  playing = true;
+  document.getElementById("btnPlay").textContent = "Pause";
+  document.getElementById("btnPlay").setAttribute("aria-pressed","true");
+  timer = setInterval(advance, 1500);
+}
+
+function buildParts(){
+  document.getElementById("partsBody").innerHTML = STEPS.map(function(st,i){
+    var sp = st.spends.length ? st.spends.join(" + ") : "—";
+    return '<tr class="clickable" data-i="'+i+'"><td class="n">'+(i+1)+'</td>' +
+      '<td><span class="code">'+esc(st.abbr)+'</span><br><span style="color:var(--ink-soft);font-size:.84rem">'+esc(st.name)+'</span></td>' +
+      '<td class="code">'+st.eq+'</td>' +
+      '<td class="code">'+sp+'</td>' +
+      '<td style="font-size:.82rem;color:var(--ink-soft)"><span class="swatch" style="background:'+CLS[st.cls].c+';display:inline-block;margin-right:.35rem"></span>'+CLS[st.cls].label+'</td></tr>';
+  }).join("");
+  Array.prototype.forEach.call(document.querySelectorAll("#partsBody tr"), function(r){
+    r.addEventListener("click", function(){
+      stop(); select(+r.getAttribute("data-i"));
+      document.getElementById("wheelBox").scrollIntoView({behavior:"smooth", block:"center"});
+    });
+  });
+}
+
+var DECKS = [
+ {q:"You are designing a CO₂-fixing cycle from scratch. Which carboxylase do you build it around?",
+  opts:[
+   {t:"Rubisco — it is the one nature uses for almost all of the carbon on Earth.",
+    f:"Defensible, and it is what every crop already does. But you inherit both of its problems: a low turnover number and an active site that cannot exclude O₂. If you are building from scratch there is no reason to inherit them."},
+   {t:"PEP carboxylase — fast, irreversible, and it is what C4 plants concentrate carbon with.",
+    f:"A reasonable instinct, and MOG-type synthetic cycles do exactly this. The catch is that PEPC uses bicarbonate rather than CO₂, so you need carbonic anhydrase and you are fixing a different species; and its product, oxaloacetate, pulls you towards central metabolism rather than a compact cycle."},
+   {t:"An enoyl-CoA carboxylase/reductase — carboxylates a C=C bond with NADPH, no biotin, no ATP.",
+    f:"This is what Schwander et al. chose. ECRs are among the fastest carboxylases known, show no oxygenase side reaction, and need no ATP. The cost is that nothing else in the cycle exists yet: you now have to build twelve reactions to get an acyl-CoA back to the carboxylase's substrate.", right:true}
+  ]},
+
+ {q:"In the assembled mixture, one enzyme runs at about 0.1 U mg⁻¹ while others exceed 1,000. What do you do about it?",
+  opts:[
+   {t:"Add far more of the slow enzyme until its total activity matches the rest.",
+    f:"The first thing to try, and it helps — but protein is not free, and in a closed cycle a large excess of one enzyme changes the whole mixture's crowding, stability and side-reaction profile. It treats the symptom."},
+   {t:"Find a faster homologue by screening the enzyme family from other organisms.",
+    f:"Sound practice and widely used. Here it would not have fixed the real problem: the limitation was not the protein's catalytic rate so much as the absence of its natural electron acceptor in the tube, which no homologue would supply."},
+   {t:"Change the chemistry — re-engineer it so it uses a substrate the mixture already has.",
+    f:"This is what they did. The dehydrogenase was converted into an oxidase that reduces O₂ directly, so no artificial electron mediator is needed at all. Reported to improve the cycle roughly twenty-fold — at the price of discarding those electrons as H₂O₂.", right:true}
+  ]},
+
+ {q:"Your carboxylase is promiscuous: some of the time it reduces its substrate without carboxylating it, producing a dead-end metabolite that drains the cycle. Your move?",
+  opts:[
+   {t:"Engineer the side reaction out of the enzyme.",
+    f:"The obvious answer, and sometimes the right one — but the two reactions share a mechanism and an active site, so selectivity engineering is slow, uncertain, and may cost you the activity you selected the enzyme for in the first place."},
+   {t:"Add an enzyme that converts the dead end back into a cycle intermediate.",
+    f:"This is the approach the authors call metabolic proofreading, and it is the most transferable idea in the paper. You accept the imperfect catalyst and pay for a correcting reaction instead. It is cheaper than perfection and it scales: every new side product gets its own return path.", right:true},
+   {t:"Run the cycle faster so the main reaction outcompetes the side reaction.",
+    f:"Rates do not work that way here. Both reactions are catalysed by the same enzyme, so raising flux raises both in proportion; the dead end still accumulates, just sooner."}
+  ]},
+
+ {q:"The cycle produces glyoxylate. For getting this into a living cell, is that a good choice of product?",
+  opts:[
+   {t:"Yes — glyoxylate is small, and small metabolites diffuse and connect easily.",
+    f:"Partly true, and it is a real advantage for in vitro work. But small and reactive is not the same as well connected: free glyoxylate is also toxic at concentration, and a cell has limited capacity to buffer it."},
+   {t:"No — glyoxylate sits at the edge of central metabolism and needs a partner before it is useful.",
+    f:"This is the standard criticism, and the authors acknowledge it. Glyoxylate must be condensed with acetyl-CoA or propionyl-CoA before it becomes a normal metabolite, so a host organism needs downstream capacity that is not part of the cycle. Later work addresses exactly this, coupling CETCH to the β-hydroxyaspartate cycle and onward to acetyl-CoA, terpenes and polyketides.", right:true},
+   {t:"It does not matter — you can always bolt on whatever downstream enzymes you need.",
+    f:"You can, and that is the direction the field went. But every bolted-on pathway adds enzymes, cofactor demand and failure modes; the choice of product determines how much of that you are signing up for, so it matters at the design stage rather than afterwards."}
+  ]}
+];
+
+function buildDecks(){
+  document.getElementById("decks").innerHTML = DECKS.map(function(d,di){
+    var opts = d.opts.map(function(o,oi){
+      return '<button class="opt" type="button" data-d="'+di+'" data-o="'+oi+'"><span class="mark">'+String.fromCharCode(65+oi)+'</span>'+esc(o.t)+'</button>';
+    }).join("");
+    return '<div class="deck"><div class="q"><b>'+esc(d.q)+'</b></div><div class="opts">'+opts+'</div><div class="fb" id="fb-'+di+'" hidden></div></div>';
+  }).join("");
+  Array.prototype.forEach.call(document.querySelectorAll(".opt"), function(b){
+    b.addEventListener("click", function(){
+      var di = +b.getAttribute("data-d"), oi = +b.getAttribute("data-o");
+      Array.prototype.forEach.call(document.querySelectorAll('.opt[data-d="'+di+'"]'), function(x){ x.classList.remove("picked"); });
+      b.classList.add("picked");
+      var o = DECKS[di].opts[oi];
+      var fb = document.getElementById("fb-"+di);
+      fb.innerHTML = '<b>'+(o.right ? "What they did." : "Worth considering.")+'</b> ' + esc(o.f);
+      fb.hidden = false;
+    });
+  });
+}
+
+var QS = [
+ {q:"Which reactions in CETCH 5.4 fix CO₂, and what does each one cost?",
+  a:["Both are catalysed by the same enzyme, crotonyl-CoA carboxylase/reductase (Ccr): acrylyl-CoA → (2S)-methylmalonyl-CoA at step 2, and crotonyl-CoA → (2S)-ethylmalonyl-CoA at step 8. Each consumes one CO₂ and one NADPH and no ATP. One protein therefore performs both carbon-fixing reactions on two different substrates — an economy of parts that is only available to you if you design the cycle around the enzyme rather than around the product."]},
+
+ {q:"Work out the ATP and NADPH cost per carbon fixed for CETCH 5.4 and for the Calvin cycle. What does the comparison actually show?",
+  a:["CBB: 3 CO₂ → 1 G3P costs 9 ATP and 6 NADPH, so 3 ATP and 2 NADPH per CO₂. CETCH 5.4: 2 CO₂ → 1 glyoxylate costs 1 ATP (hydrolysed to AMP, so 2 ATP equivalents) and 4 NADPH, so 0.5 ATP — 1 equivalent — and 2 NADPH per CO₂.",
+      "The reducing power is identical. The entire advantage is in ATP, and it comes from not having to regenerate a sugar bisphosphate. A useful corollary for students: a pathway can be 'more efficient' on one currency and indistinguishable on another, so always ask which currency is being counted."]},
+
+ {q:"Two steps reduce O₂ to H₂O₂, which catalase then destroys. What is the thermodynamic cost of that design choice, and why might it still be correct?",
+  a:["Each oxidase step transfers a pair of electrons to O₂ and the resulting peroxide is destroyed, so the electrons are lost. In the natural ethylmalonyl-CoA pathway the equivalent dehydrogenase passes them to an electron-transfer flavoprotein and the cell recovers them. Per turn the cycle therefore pays for 4 NADPH and throws away the equivalent of two further electron pairs.",
+      "It is still defensible in vitro: the alternative required an electron acceptor the mixture did not have, and the oxidase version removed the cycle's rate-limiting step. The judgement would change in a cell, where reducing power is expensive, oxygen tension varies and H₂O₂ is a hazard rather than a catalase substrate."]},
+
+ {q:"Ccr is described as a better carboxylase than Rubisco. Which measurements support that claim, and which complicate it?",
+  a:["Supporting: high turnover number (ECRs are reported by the Erb group to carboxylate up to about twenty times faster than Rubisco), no detectable oxygenase side reaction, and no requirement for ATP or biotin.",
+      "Complicating: comparative analyses of catalytic efficiency put the margin much lower, only a few-fold. The two enzymes also act on completely different substrates — a sugar bisphosphate present at high concentration in a chloroplast versus a CoA thioester that a chloroplast does not maintain — so turnover numbers alone do not predict in vivo flux. The honest statement is that Ccr is a better carboxylase for a designed pathway, not that it would outperform Rubisco if dropped into a leaf."]},
+
+ {q:"The paper reports 17 enzymes from nine organisms across all three domains of life. Why is that framing a claim about synthetic biology rather than just a fact about the method?",
+  a:["It is the point of the retrosynthetic approach. A natural pathway is constrained to the enzyme set one lineage happened to evolve; a designed pathway treats the whole sequenced biosphere as a parts catalogue and selects on function rather than on ancestry. The nine organisms are evidence that the design space is much larger than any single organism's metabolism.",
+      "The counter-argument is worth raising too: parts selected independently have never been co-optimised for pH, stability, cofactor specificity or mutual interference, which is precisely why the first version did not work and why five rounds of optimisation were needed."]},
+
+ {q:"An obvious alternative to steps 1 and 2 is to carboxylate propionyl-CoA directly with propionyl-CoA carboxylase, an ATP- and biotin-dependent enzyme. What does the route actually used buy, and what does it cost?",
+  a:["Buys: it removes an ATP-consuming reaction from the cycle, and it reuses Ccr — a part already present — for a second carboxylation instead of introducing a different carboxylase with its own cofactor requirement (biotin) and its own expression problems.",
+      "Costs: it adds an oxidase step, so the cycle now consumes O₂, produces H₂O₂ and discards a pair of electrons. It also makes the cycle oxygen-dependent, which sits awkwardly with the oxygen-sensitive dehydratase at step 7. This is the general shape of synthetic-pathway design: you trade one currency for another and have to decide which one is scarce."]},
+
+ {q:"Design an experiment to test whether CETCH could support growth in a host cell. What would you measure, and what controls would you need?",
+  a:["A workable outline: express the core enzymes in a host whose own route to the product has been deleted, so growth depends on the synthetic cycle; feed ¹³C-labelled bicarbonate or CO₂ and follow label into the expected intermediates and into biomass by LC-MS; quantify flux rather than just presence of product.",
+      "Essential controls: a strain lacking one essential cycle enzyme (should not grow or label); a strain with the cycle but no labelled carbon; measurement of CoA-ester pool sizes to show the intermediates are actually present at useful concentrations; and a check on B₁₂ availability, since two mutases depend on it. The result that would count as success is labelled carbon in biomass at a flux that supports growth — not merely detection of glyoxylate."]}
+];
+
+function buildQs(){
+  document.getElementById("qs").innerHTML = QS.map(function(q,i){
+    return '<details><summary><span class="qn">Q'+(i+1)+'</span><span class="qt">'+esc(q.q)+'</span></summary>' +
+      '<div class="ans">'+q.a.map(function(p){ return '<p>'+esc(p)+'</p>'; }).join("")+'</div></details>';
+  }).join("");
+}
+
+buildWheel();
+buildParts();
+buildDecks();
+buildQs();
+renderLedger();
+select(0);
+
+document.getElementById("btnPlay").addEventListener("click", function(){ playing ? stop() : start(); });
+document.getElementById("btnStep").addEventListener("click", function(){ stop(); advance(); });
+document.getElementById("btnReset").addEventListener("click", function(){
+  stop();
+  led = {co2:0,nadph:0,atp:0,o2:0,h2o2:0,gly:0};
+  turns = 0;
+  document.getElementById("turns").textContent = "0";
+  renderLedger();
+  select(0);
+});
+})();
+</script>
+
+</body></html>
